@@ -1,0 +1,86 @@
+diff --git a/user/sh.c b/user/sh.c
+index 83dd513..775b6cd 100644
+--- a/user/sh.c
++++ b/user/sh.c
+@@ -130,12 +130,72 @@ runcmd(struct cmd *cmd)
+   exit(0);
+ }
+ 
++#include "kernel/fs.h"
++char* prefixMatch(char* dir, char *targetName)
++{
++    // 打开这个路径
++    int fd = open(dir, 0);
++    if(fd < 0) {
++        fprintf(2, "find: cannot open %s\n", dir);
++        return 0;
++    }
++    // 用 static 确保生命期
++    static struct dirent de;
++    // buf 是新的路径 或者是文件
++    while(read(fd, &de, sizeof de) == sizeof de) {
++        if(strcmp(de.name, ".") == 0) continue;
++        if(strcmp(de.name, "..") == 0) continue; 
++        if(de.inum == 0) 
++            continue;
++        // 前缀查找
++        char *p = targetName, *q = de.name;
++        while(*p != 0 && *q != 0 && *p == *q) ++p, ++ q;
++        if(*p == 0) {
++            // 直接返回 完整的文件名
++            return de.name;
++        }
++       
++    }
++    return 0;
++}
++
++char*
++getst(char *buf, int max)
++{
++  int i, cc;
++  char c;
++  for(i=0; i+1 < max; ){
++    cc = read(0, &c, 1);
++    if(cc < 1)
++      break;
++    if(c == '\t') {
++        buf[i] = 0;
++        // 找到最后一个 单词
++        int j = i - 1;
++        while(j >= 0 && buf[j] != ' ') --j;
++        ++j;
++        // 将匹配的 完整单词 附加到 buf 上
++        char *complete  = prefixMatch(".", buf + j);
++        if(complete != 0)  {
++            strcpy(buf + j, complete);
++            fprintf(2, "auto-completion : %s\n", buf);
++            return buf;
++        }
++    }
++    buf[i++] = c;
++    if(c == '\n' || c == '\r')
++      break;
++  }
++  buf[i] = '\0';
++  return buf;
++}
++
+ int
+ getcmd(char *buf, int nbuf)
+ {
+   fprintf(2, "$ ");
+   memset(buf, 0, nbuf);
+-  gets(buf, nbuf);
++  getst(buf, nbuf);
+   if(buf[0] == 0) // EOF
+     return -1;
+   return 0;
+@@ -146,7 +206,6 @@ main(void)
+ {
+   static char buf[100];
+   int fd;
+-
+   // Ensure that three file descriptors are open.
+   while((fd = open("console", O_RDWR)) >= 0){
+     if(fd >= 3){

@@ -13,12 +13,14 @@ main(int argc, char *argv[])
     if (pid == 0) {
         close(p1[1]);
         close(p2[0]);
+        
         read(p1[0], &byte, sizeof byte);
         printf("%d: received ping\n", getpid());
         write(p2[1], &byte, sizeof byte);
     } else {
         close(p1[0]);
         close(p2[1]);
+
         write(p1[1], &byte, sizeof byte);
         read(p2[0], &byte, sizeof byte);
         printf("%d: received pong\n", getpid());

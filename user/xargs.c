@@ -26,8 +26,7 @@ int main(int argc, char *argv[])
     for(;; ) {
         char *p = getline(0);
         if(p == 0) break;
-
-        printf("fork %s t\n", p);
+        // printf("fork %s t\n", p);
         if(fork() == 0) {
             for(int i = 0;i + 1 < argc; ++ i)
                 argv[i] = argv[i + 1];
