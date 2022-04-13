@@ -139,6 +139,7 @@ int             fetchstr(uint64, char*, int);
 int             fetchaddr(uint64, uint64*);
 void            syscall();
 
+
 // trap.c
 extern uint     ticks;
 void            trapinit(void);
