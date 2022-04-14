@@ -21,6 +21,19 @@ static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
 
+// 遍历 proc 数组统计 每一个不是 UNUSED 的进程即可
+uint64 countProc(void)
+{
+    uint64 nproc = 0;
+    for(struct proc *p = &proc[0]; p < &proc[NPROC]; ++p) {
+      	acquire(&p->lock);
+				if(p->state != UNUSED)
+					++nproc;
+				release(&p->lock);
+    }
+		return nproc;
+}
+
 // initialize the proc table at boot time.
 void
 procinit(void)
@@ -126,7 +139,7 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+	p->tracemask = 0; // 防止垃圾数据
   return p;
 }
 

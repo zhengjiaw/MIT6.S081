@@ -105,6 +105,8 @@ extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
 extern uint64 sys_trace(void);
+extern uint64 sys_sysinfo(void);
+
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -128,7 +130,8 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
-[SYS_trace]   sys_trace
+[SYS_trace]   sys_trace,
+[SYS_sysinfo] sys_sysinfo,
 };
 
 const char *syscall_names[] = {
@@ -154,6 +157,7 @@ const char *syscall_names[] = {
 [SYS_mkdir]   "mkdir",
 [SYS_close]   "close",
 [SYS_trace]   "trace",
+[SYS_sysinfo] "sysinfo",
 };
 
 void trace(int mask)
@@ -173,6 +177,28 @@ sys_trace(void)
   trace(mask);
   return 0;  // not reached
 }
+#include "sysinfo.h"
+extern uint64 countFreeMem(void);
+extern uint64 countProc(void);
+uint64 sysinfo(struct sysinfo *info)
+{
+    uint64 freemem = countFreeMem();
+    uint64 nproc = countProc();
+    struct proc *p = myproc();
+    if(copyout(p->pagetable, (uint64)&info->freemem, (char*)&freemem, sizeof freemem) < 0 ||
+       copyout(p->pagetable, (uint64)&info->nproc, (char*)&nproc, sizeof nproc) < 0)
+       return -1;
+    return 0;
+}
+
+uint64 sys_sysinfo(void) 
+{
+    struct sysinfo *inf;
+    if(argaddr(0, (uint64*)&inf) < 0) 
+        return -1;
+    return sysinfo(inf);
+}
+
 void
 syscall(void)
 {
