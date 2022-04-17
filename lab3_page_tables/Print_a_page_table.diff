@@ -1,0 +1,77 @@
+diff --git a/grade-lab-pgtbl b/grade-lab-pgtbl
+index 2b0b49d..e17c4d2 100755
+--- a/grade-lab-pgtbl
++++ b/grade-lab-pgtbl
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/env python3
+ 
+ import re
+ from gradelib import *
+diff --git a/kernel/defs.h b/kernel/defs.h
+index a73b4f7..e834c21 100644
+--- a/kernel/defs.h
++++ b/kernel/defs.h
+@@ -8,6 +8,7 @@ struct spinlock;
+ struct sleeplock;
+ struct stat;
+ struct superblock;
++struct pagetable_t;
+ #ifdef LAB_NET
+ struct mbuf;
+ struct sock;
+@@ -158,6 +159,7 @@ void            uartputc_sync(int);
+ int             uartgetc(void);
+ 
+ // vm.c
++void            vmprint(pagetable_t);
+ void            kvminit(void);
+ void            kvminithart(void);
+ uint64          kvmpa(uint64);
+diff --git a/kernel/exec.c b/kernel/exec.c
+index 0e8762f..ee72a53 100644
+--- a/kernel/exec.c
++++ b/kernel/exec.c
+@@ -115,7 +115,7 @@ exec(char *path, char **argv)
+   p->trapframe->epc = elf.entry;  // initial program counter = main
+   p->trapframe->sp = sp; // initial stack pointer
+   proc_freepagetable(oldpagetable, oldsz);
+-
++  if(p->pid == 1) vmprint(p->pagetable);
+   return argc; // this ends up in a0, the first argument to main(argc, argv)
+ 
+  bad:
+diff --git a/kernel/vm.c b/kernel/vm.c
+index bccb405..b2c9802 100644
+--- a/kernel/vm.c
++++ b/kernel/vm.c
+@@ -14,6 +14,29 @@ pagetable_t kernel_pagetable;
+ extern char etext[];  // kernel.ld sets this to end of kernel code.
+ 
+ extern char trampoline[]; // trampoline.S
++// 前序遍历整个页表，printf 所有 PTE_V 的页表基地址
++static void vmprint_helper(pagetable_t pagetable, int layout)
++{
++    for(int i = 0;i < 512; ++i) {
++        pte_t pte = pagetable[i];
++        if((pte & PTE_V)) {
++            // 求出这一页对应的物理地址
++            uint64 child = PTE2PA(pte);
++            for(int i = 0;i < layout; ++i)
++                printf(".. ");
++            printf("..%d: pte %p pa %p\n", i, pte, child);
++            // 如果这一页可运行或读或写，那么就是最底层页表了，不用继续遍历了
++            if((pte & (PTE_R|PTE_W|PTE_X)) == 0)
++                vmprint_helper((pagetable_t)child, layout + 1);
++        }
++    }
++}
++
++void vmprint(pagetable_t pagetable)
++{
++    printf("page table %p\n", pagetable);
++    vmprint_helper(pagetable, 0);
++}
+ 
+ /*
+  * create a direct-map page table for the kernel.

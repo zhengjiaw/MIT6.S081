@@ -14,6 +14,29 @@ pagetable_t kernel_pagetable;
 extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
+// 前序遍历整个页表，printf 所有 PTE_V 的页表基地址
+static void vmprint_helper(pagetable_t pagetable, int layout)
+{
+    for(int i = 0;i < 512; ++i) {
+        pte_t pte = pagetable[i];
+        if((pte & PTE_V)) {
+            // 求出这一页对应的物理地址
+            uint64 child = PTE2PA(pte);
+            for(int i = 0;i < layout; ++i)
+                printf(".. ");
+            printf("..%d: pte %p pa %p\n", i, pte, child);
+            // 如果这一页可运行或读或写，那么就是最底层页表了，不用继续遍历了
+            if((pte & (PTE_R|PTE_W|PTE_X)) == 0)
+                vmprint_helper((pagetable_t)child, layout + 1);
+        }
+    }
+}
+
+void vmprint(pagetable_t pagetable)
+{
+    printf("page table %p\n", pagetable);
+    vmprint_helper(pagetable, 0);
+}
 
 /*
  * create a direct-map page table for the kernel.
