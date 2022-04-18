@@ -25,23 +25,13 @@ extern char trampoline[]; // trampoline.S
 void
 procinit(void)
 {
-  struct proc *p;
+  struct proc *p = proc;
   
   initlock(&pid_lock, "nextpid");
-  for(p = proc; p < &proc[NPROC]; p++) {
-      initlock(&p->lock, "proc");
-
-      // Allocate a page for the process's kernel stack.
-      // Map it high in memory, followed by an invalid
-      // guard page.
-      char *pa = kalloc();
-      if(pa == 0)
-        panic("kalloc");
-      uint64 va = KSTACK((int) (p - proc));
-      kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
-      p->kstack = va;
-  }
-  kvminithart();
+  for(p = proc; p < &proc[NPROC]; p++) 
+    initlock(&p->lock, "proc");
+  
+  kvminithart(); // 切换此进程的内核页表
 }
 
 // Must be called with interrupts disabled,
@@ -120,13 +110,23 @@ found:
     release(&p->lock);
     return 0;
   }
+  
+  kvm_init_pagetable(&p->kernel_pagetable); // 初始化每一个进程内核页表
+  // Allocate a page for the process's kernel stack.
+  // Map it high in memory, followed by an invalid
+  // guard page.
+  char *pa = kalloc();
+  if(pa == 0)
+    panic("kalloc");
+  uint64 va = KSTACK((int) (0));
+  kvmmap_pagetable(p->kernel_pagetable, va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+  p->kstack = va;
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
   return p;
 }
 
@@ -150,6 +150,12 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  
+  uint64 kstack_pa  = kvmpa(p->kernel_pagetable, p->kstack);
+  kfree((void*)kstack_pa);
+  p->kstack = 0;
+  kernel_pagetable_free(p->kernel_pagetable);
+  p->kernel_pagetable = 0;
 }
 
 // Create a user page table for a given process,
@@ -473,8 +479,9 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+        kvminithart_pagetable(p->kernel_pagetable); // 切换此进程的内核页表
         swtch(&c->context, &p->context);
-
+        kvminithart(); // 没有进程就切换为 原来的内核页表
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
