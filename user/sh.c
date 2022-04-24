@@ -154,7 +154,13 @@ main(void)
       break;
     }
   }
-
+  // 每次启动自动测试 usertests 
+//   {
+//     if(fork1() == 0)  
+//       runcmd(parsecmd("usertests\n"));
+//     wait(0);
+//   }
+  
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){

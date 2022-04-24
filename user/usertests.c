@@ -132,7 +132,6 @@ void
 copyinstr2(char *s)
 {
   char b[MAXPATH+1];
-
   for(int i = 0; i < MAXPATH; i++)
     b[i] = 'x';
   b[MAXPATH] = '\0';
@@ -142,7 +141,6 @@ copyinstr2(char *s)
     printf("unlink(%s) returned %d, not -1\n", b, ret);
     exit(1);
   }
-
   int fd = open(b, O_CREATE | O_WRONLY);
   if(fd != -1){
     printf("open(%s) returned %d, not -1\n", b, fd);
@@ -167,12 +165,13 @@ copyinstr2(char *s)
     printf("fork failed\n");
     exit(1);
   }
+
   if(pid == 0){
-    static char big[PGSIZE+1];
+    static char big[PGSIZE+1 ];
     for(int i = 0; i < PGSIZE; i++)
       big[i] = 'x';
     big[PGSIZE] = '\0';
-    char *args2[] = { big, big, big, 0 };
+    char *args2[] = { big, big, big,big, 0 };
     ret = exec("echo", args2);
     if(ret != -1){
       printf("exec(echo, BIG) returned %d, not -1\n", fd);

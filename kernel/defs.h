@@ -159,6 +159,7 @@ void            uartputc_sync(int);
 int             uartgetc(void);
 
 // vm.c
+int             uvmcopy_not_physical(pagetable_t, pagetable_t, uint64, uint64);           
 void            kvmmap_pagetable(pagetable_t kernel_pagetable, 
                 uint64 va, uint64 pa, uint64 sz, int perm);
 void            kernel_pagetable_free(pagetable_t);
