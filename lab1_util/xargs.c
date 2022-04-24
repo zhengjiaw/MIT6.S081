@@ -28,6 +28,7 @@ int main(int argc, char *argv[])
         if(p == 0) break;
         // printf("fork %s t\n", p);
         if(fork() == 0) {
+            char *argv[MAXARG];
             for(int i = 0;i + 1 < argc; ++ i)
                 argv[i] = argv[i + 1];
             argv[argc - 1] = p;
