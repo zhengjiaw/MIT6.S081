@@ -1,0 +1,165 @@
+diff --git a/Makefile b/Makefile
+index 1c07efd..26783ee 100644
+--- a/Makefile
++++ b/Makefile
+@@ -150,8 +150,7 @@ UPROGS=\
+ 	$U/_wc\
+ 	$U/_zombie\
+ 	$U/_trace\
+-
+-
++	$U/_sysinfotest\
+ 
+ ifeq ($(LAB),trap)
+ UPROGS += \
+diff --git a/kernel/kalloc.c b/kernel/kalloc.c
+index fa6a0ac..e270177 100644
+--- a/kernel/kalloc.c
++++ b/kernel/kalloc.c
+@@ -80,3 +80,18 @@ kalloc(void)
+     memset((char*)r, 5, PGSIZE); // fill with junk
+   return (void*)r;
+ }
++
++// 遍历 freelist 的节点，节点个数 * PGSIZE 即是空闲内存 byte
++uint64 countFreeMem(void)
++{
++    struct run *r;
++    acquire(&kmem.lock);
++    r = kmem.freelist;
++    uint64 freeMem = 0;
++    while(r) {
++        freeMem += PGSIZE;
++        r = r->next;
++    }
++    release(&kmem.lock);
++    return freeMem;
++}
+\ No newline at end of file
+diff --git a/kernel/proc.c b/kernel/proc.c
+index 0ef0795..fc602d9 100644
+--- a/kernel/proc.c
++++ b/kernel/proc.c
+@@ -21,6 +21,19 @@ static void freeproc(struct proc *p);
+ 
+ extern char trampoline[]; // trampoline.S
+ 
++// 遍历 proc 数组统计 每一个不是 UNUSED 的进程即可
++uint64 countProc(void)
++{
++    uint64 nproc = 0;
++    for(struct proc *p = &proc[0]; p < &proc[NPROC]; ++p) {
++      	acquire(&p->lock);
++				if(p->state != UNUSED)
++					++nproc;
++				release(&p->lock);
++    }
++		return nproc;
++}
++
+ // initialize the proc table at boot time.
+ void
+ procinit(void)
+@@ -126,7 +139,7 @@ found:
+   memset(&p->context, 0, sizeof(p->context));
+   p->context.ra = (uint64)forkret;
+   p->context.sp = p->kstack + PGSIZE;
+-
++	p->tracemask = 0; // 防止垃圾数据
+   return p;
+ }
+ 
+diff --git a/kernel/syscall.c b/kernel/syscall.c
+index 9656d91..022a860 100644
+--- a/kernel/syscall.c
++++ b/kernel/syscall.c
+@@ -105,6 +105,8 @@ extern uint64 sys_wait(void);
+ extern uint64 sys_write(void);
+ extern uint64 sys_uptime(void);
+ extern uint64 sys_trace(void);
++extern uint64 sys_sysinfo(void);
++
+ 
+ static uint64 (*syscalls[])(void) = {
+ [SYS_fork]    sys_fork,
+@@ -128,7 +130,8 @@ static uint64 (*syscalls[])(void) = {
+ [SYS_link]    sys_link,
+ [SYS_mkdir]   sys_mkdir,
+ [SYS_close]   sys_close,
+-[SYS_trace]   sys_trace
++[SYS_trace]   sys_trace,
++[SYS_sysinfo] sys_sysinfo,
+ };
+ 
+ const char *syscall_names[] = {
+@@ -154,6 +157,7 @@ const char *syscall_names[] = {
+ [SYS_mkdir]   "mkdir",
+ [SYS_close]   "close",
+ [SYS_trace]   "trace",
++[SYS_sysinfo] "sysinfo",
+ };
+ 
+ void trace(int mask)
+@@ -173,6 +177,28 @@ sys_trace(void)
+   trace(mask);
+   return 0;  // not reached
+ }
++#include "sysinfo.h"
++extern uint64 countFreeMem(void);
++extern uint64 countProc(void);
++uint64 sysinfo(struct sysinfo *info)
++{
++    uint64 freemem = countFreeMem();
++    uint64 nproc = countProc();
++    struct proc *p = myproc();
++    if(copyout(p->pagetable, (uint64)&info->freemem, (char*)&freemem, sizeof freemem) < 0 ||
++       copyout(p->pagetable, (uint64)&info->nproc, (char*)&nproc, sizeof nproc) < 0)
++       return -1;
++    return 0;
++}
++
++uint64 sys_sysinfo(void) 
++{
++    struct sysinfo *inf;
++    if(argaddr(0, (uint64*)&inf) < 0) 
++        return -1;
++    return sysinfo(inf);
++}
++
+ void
+ syscall(void)
+ {
+diff --git a/kernel/syscall.h b/kernel/syscall.h
+index cc112b9..8d0f670 100644
+--- a/kernel/syscall.h
++++ b/kernel/syscall.h
+@@ -21,3 +21,4 @@
+ #define SYS_mkdir  20
+ #define SYS_close  21
+ #define SYS_trace  22
++#define SYS_sysinfo   23
+\ No newline at end of file
+diff --git a/user/user.h b/user/user.h
+index 7e380bf..c89f7dd 100644
+--- a/user/user.h
++++ b/user/user.h
+@@ -3,6 +3,8 @@ struct rtcdate;
+ 
+ // system calls
+ int trace(int);
++struct sysinfo;
++int sysinfo(struct sysinfo *);
+ int fork(void);
+ int exit(int) __attribute__((noreturn));
+ int wait(int*);
+diff --git a/user/usys.pl b/user/usys.pl
+index afb754e..ea93058 100755
+--- a/user/usys.pl
++++ b/user/usys.pl
+@@ -37,4 +37,6 @@ entry("sbrk");
+ entry("sleep");
+ entry("uptime");
+ entry("trace");
++entry("sysinfo");
++
+ 
