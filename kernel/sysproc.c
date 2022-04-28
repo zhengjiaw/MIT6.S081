@@ -60,6 +60,7 @@ sys_sleep(void)
 
   if(argint(0, &n) < 0)
     return -1;
+  backtrace(); // 不可以放到 acquire 后面，会通不过测试
   acquire(&tickslock);
   ticks0 = ticks;
   while(ticks - ticks0 < n){

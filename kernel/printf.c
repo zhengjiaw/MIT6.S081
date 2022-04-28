@@ -15,6 +15,17 @@
 #include "defs.h"
 #include "proc.h"
 
+void backtrace()
+{
+    printf("backtrace:\n");
+    uint64 fp = r_fp();
+    while(PGROUNDDOWN(fp) != PGROUNDUP(fp) ) {
+        printf("%p\n", *(uint64*)(fp - 8));
+        fp = *(uint64*)(fp - 16);
+    }
+    // printf("%p\n", fp);
+}
+
 volatile int panicked = 0;
 
 // lock to avoid interleaving concurrent printf's.
@@ -119,6 +130,7 @@ panic(char *s)
 {
   pr.locking = 0;
   printf("panic: ");
+//   backtrace();
   printf(s);
   printf("\n");
   panicked = 1; // freeze uart output from other CPUs
