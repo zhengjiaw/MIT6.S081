@@ -1,0 +1,197 @@
+diff --git a/Makefile b/Makefile
+index 1fa367e..f5da769 100644
+--- a/Makefile
++++ b/Makefile
+@@ -175,7 +175,7 @@ UPROGS=\
+ 	$U/_grind\
+ 	$U/_wc\
+ 	$U/_zombie\
+-
++	$U/_alarmtest\
+ 
+ 
+ 
+diff --git a/kernel/proc.c b/kernel/proc.c
+index dab1e1d..811657a 100644
+--- a/kernel/proc.c
++++ b/kernel/proc.c
+@@ -126,7 +126,12 @@ found:
+   memset(&p->context, 0, sizeof(p->context));
+   p->context.ra = (uint64)forkret;
+   p->context.sp = p->kstack + PGSIZE;
+-
++  
++  memset(&p->alm, 0, sizeof p->alm);
++  if((p->alm.trapframe = (struct trapframe *)kalloc()) == 0){
++    release(&p->lock);
++    return 0;
++  }
+   return p;
+ }
+ 
+@@ -150,6 +155,9 @@ freeproc(struct proc *p)
+   p->killed = 0;
+   p->xstate = 0;
+   p->state = UNUSED;
++  if(p->alm.trapframe)
++    kfree((void*)p->alm.trapframe);
++  memset(&p->alm, 0, sizeof p->alm);
+ }
+ 
+ // Create a user page table for a given process,
+diff --git a/kernel/proc.h b/kernel/proc.h
+index 9c16ea7..326b411 100644
+--- a/kernel/proc.h
++++ b/kernel/proc.h
+@@ -81,7 +81,13 @@ struct trapframe {
+ };
+ 
+ enum procstate { UNUSED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+-
++struct alarm {
++  int count; // 用户设置的 ticks 周期
++  int ticks_count; // 已经减少了的 周期， 为0的时候调用 handler
++  void (*handler)();
++  struct trapframe *trapframe; // 为了恢复上下文
++  int processing; // handler 如果真正调用 就为 1，否则为0
++};
+ // Per-process state
+ struct proc {
+   struct spinlock lock;
+@@ -103,4 +109,5 @@ struct proc {
+   struct file *ofile[NOFILE];  // Open files
+   struct inode *cwd;           // Current directory
+   char name[16];               // Process name (debugging)
++  struct alarm alm;
+ };
+diff --git a/kernel/syscall.c b/kernel/syscall.c
+index c1b3670..aa75ec7 100644
+--- a/kernel/syscall.c
++++ b/kernel/syscall.c
+@@ -104,6 +104,8 @@ extern uint64 sys_unlink(void);
+ extern uint64 sys_wait(void);
+ extern uint64 sys_write(void);
+ extern uint64 sys_uptime(void);
++extern uint64 sys_sigalarm(void);
++extern uint64 sys_sigreturn(void);
+ 
+ static uint64 (*syscalls[])(void) = {
+ [SYS_fork]    sys_fork,
+@@ -127,8 +129,30 @@ static uint64 (*syscalls[])(void) = {
+ [SYS_link]    sys_link,
+ [SYS_mkdir]   sys_mkdir,
+ [SYS_close]   sys_close,
++[SYS_sigalarm]   sys_sigalarm,
++[SYS_sigreturn]   sys_sigreturn,
+ };
+ 
++
++uint64 sys_sigalarm(void)
++{
++  struct proc *p = myproc(); 
++  if(argint(0, &p->alm.count) < 0 || argaddr(1, (uint64*)(&p->alm.handler)) < 0){
++    return -1;
++  }
++//   printf("count origin: %d  %p\n",p->alm.count, p->alm.handler );
++  p->alm.ticks_count = p->alm.count;
++  return 0;
++}
++void* memmove(void *, const void *, uint);
++uint64 sys_sigreturn(void)
++{
++  struct proc *p = myproc();
++  memmove(p->trapframe, p->alm.trapframe, sizeof (struct trapframe));
++  p->alm.processing = 0;
++  usertrapret();
++  return 0;
++}
+ void
+ syscall(void)
+ {
+diff --git a/kernel/syscall.h b/kernel/syscall.h
+index bc5f356..c09f4bd 100644
+--- a/kernel/syscall.h
++++ b/kernel/syscall.h
+@@ -20,3 +20,5 @@
+ #define SYS_link   19
+ #define SYS_mkdir  20
+ #define SYS_close  21
++#define SYS_sigalarm 22
++#define SYS_sigreturn 23
+\ No newline at end of file
+diff --git a/kernel/trap.c b/kernel/trap.c
+index a63249e..2e60c29 100644
+--- a/kernel/trap.c
++++ b/kernel/trap.c
+@@ -5,7 +5,7 @@
+ #include "spinlock.h"
+ #include "proc.h"
+ #include "defs.h"
+-
++void* memmove(void *, const void *, uint);
+ struct spinlock tickslock;
+ uint ticks;
+ 
+@@ -75,10 +75,21 @@ usertrap(void)
+ 
+   if(p->killed)
+     exit(-1);
+-
+   // give up the CPU if this is a timer interrupt.
+-  if(which_dev == 2)
+-    yield();
++  if(which_dev == 2) {
++    // alm.count 即 tricks 数量不为0， 且 handler 不在运行中
++    if(p->alm.count != 0 && p->alm.processing == 0) { 
++      if(--p->alm.ticks_count == 0 ) {
++        p->alm.ticks_count = p->alm.count;
++        p->alm.processing = 1;
++        // 保存当前所有寄存器
++        memmove(p->alm.trapframe, p->trapframe, sizeof (struct trapframe));
++        // epc 是 sret 设置的 PC，更换之后就可以返回到 handler
++        p->trapframe->epc = (uint64)p->alm.handler;
++      }
++    }
++    yield();    
++  }
+ 
+   usertrapret();
+ }
+diff --git a/user/sh.c b/user/sh.c
+index 83dd513..c6dcfce 100644
+--- a/user/sh.c
++++ b/user/sh.c
+@@ -154,7 +154,9 @@ main(void)
+       break;
+     }
+   }
+-
++//   if(fork1() == 0)
++//     runcmd(parsecmd("alarmtest\n"));
++//   wait(0);
+   // Read and run input commands.
+   while(getcmd(buf, sizeof(buf)) >= 0){
+     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
+diff --git a/user/user.h b/user/user.h
+index b71ecda..57404e0 100644
+--- a/user/user.h
++++ b/user/user.h
+@@ -23,6 +23,8 @@ int getpid(void);
+ char* sbrk(int);
+ int sleep(int);
+ int uptime(void);
++int sigalarm(int ticks, void (*handler)());
++int sigreturn(void);
+ 
+ // ulib.c
+ int stat(const char*, struct stat*);
+diff --git a/user/usys.pl b/user/usys.pl
+index 01e426e..fa548b0 100755
+--- a/user/usys.pl
++++ b/user/usys.pl
+@@ -36,3 +36,5 @@ entry("getpid");
+ entry("sbrk");
+ entry("sleep");
+ entry("uptime");
++entry("sigalarm");
++entry("sigreturn");
