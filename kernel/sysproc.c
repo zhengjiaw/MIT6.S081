@@ -37,6 +37,15 @@ sys_wait(void)
     return -1;
   return wait(p);
 }
+static int
+growproc_lazy(int n)
+{
+  struct proc *p = myproc();
+  if(n < 0)
+    p->sz = uvmdealloc(p->pagetable, p->sz, p->sz + n);
+  else p->sz += n;
+  return 0;
+}
 
 uint64
 sys_sbrk(void)
@@ -47,7 +56,8 @@ sys_sbrk(void)
   if(argint(0, &n) < 0)
     return -1;
   addr = myproc()->sz;
-  if(growproc(n) < 0)
+  
+  if(growproc_lazy(n) < 0)
     return -1;
   return addr;
 }
