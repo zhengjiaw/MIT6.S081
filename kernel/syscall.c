@@ -104,6 +104,8 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
+extern uint64 sys_sigalarm(void);
+extern uint64 sys_sigreturn(void);
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -127,8 +129,30 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_sigalarm]   sys_sigalarm,
+[SYS_sigreturn]   sys_sigreturn,
 };
 
+
+uint64 sys_sigalarm(void)
+{
+  struct proc *p = myproc(); 
+  if(argint(0, &p->alm.count) < 0 || argaddr(1, (uint64*)(&p->alm.handler)) < 0){
+    return -1;
+  }
+//   printf("count origin: %d  %p\n",p->alm.count, p->alm.handler );
+  p->alm.ticks_count = p->alm.count;
+  return 0;
+}
+void* memmove(void *, const void *, uint);
+uint64 sys_sigreturn(void)
+{
+  struct proc *p = myproc();
+  memmove(p->trapframe, p->alm.trapframe, sizeof (struct trapframe));
+  p->alm.processing = 0;
+  usertrapret();
+  return 0;
+}
 void
 syscall(void)
 {

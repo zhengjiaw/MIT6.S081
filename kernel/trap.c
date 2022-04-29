@@ -5,7 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
-
+void* memmove(void *, const void *, uint);
 struct spinlock tickslock;
 uint ticks;
 
@@ -75,10 +75,21 @@ usertrap(void)
 
   if(p->killed)
     exit(-1);
-
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
-    yield();
+  if(which_dev == 2) {
+    // alm.count 即 tricks 数量不为0， 且 handler 不在运行中
+    if(p->alm.count != 0 && p->alm.processing == 0) { 
+      if(--p->alm.ticks_count == 0 ) {
+        p->alm.ticks_count = p->alm.count;
+        p->alm.processing = 1;
+        // 保存当前所有寄存器
+        memmove(p->alm.trapframe, p->trapframe, sizeof (struct trapframe));
+        // epc 是 sret 设置的 PC，更换之后就可以返回到 handler
+        p->trapframe->epc = (uint64)p->alm.handler;
+      }
+    }
+    yield();    
+  }
 
   usertrapret();
 }

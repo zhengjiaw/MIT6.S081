@@ -154,7 +154,9 @@ main(void)
       break;
     }
   }
-
+//   if(fork1() == 0)
+//     runcmd(parsecmd("alarmtest\n"));
+//   wait(0);
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){

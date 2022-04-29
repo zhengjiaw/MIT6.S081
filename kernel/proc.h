@@ -81,7 +81,13 @@ struct trapframe {
 };
 
 enum procstate { UNUSED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
-
+struct alarm {
+  int count; // 用户设置的 ticks 周期
+  int ticks_count; // 已经减少了的 周期， 为0的时候调用 handler
+  void (*handler)();
+  struct trapframe *trapframe; // 为了恢复上下文
+  int processing; // handler 如果真正调用 就为 1，否则为0
+};
 // Per-process state
 struct proc {
   struct spinlock lock;
@@ -103,4 +109,5 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  struct alarm alm;
 };
