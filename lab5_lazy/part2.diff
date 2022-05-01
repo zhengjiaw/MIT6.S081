@@ -1,0 +1,43 @@
+diff --git a/kernel/trap.c b/kernel/trap.c
+index a63249e..7199c21 100644
+--- a/kernel/trap.c
++++ b/kernel/trap.c
+@@ -67,6 +67,25 @@ usertrap(void)
+     syscall();
+   } else if((which_dev = devintr()) != 0){
+     // ok
++  } else if(r_scause() == 15 || r_scause() == 13) {
++      uint64 va = r_stval();
++      printf("page fault %p\n", va);
++      if(va > p->sz) {
++        printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
++        printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
++        p->killed = 1;
++      } else {
++          void* kp = kalloc();
++          memset(kp, 0, PGSIZE);
++          if(kp == 0)  {
++              printf("out of memory\n");
++              p->killed = 1;
++          }
++          if(mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)kp, PTE_U | PTE_W | PTE_R) < 0) {
++              kfree(kp);
++              p->killed = 1;
++          }
++      }
+   } else {
+     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+diff --git a/kernel/vm.c b/kernel/vm.c
+index bccb405..541c5e0 100644
+--- a/kernel/vm.c
++++ b/kernel/vm.c
+@@ -183,7 +183,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
+     if((pte = walk(pagetable, a, 0)) == 0)
+       panic("uvmunmap: walk");
+     if((*pte & PTE_V) == 0)
+-      panic("uvmunmap: not mapped");
++      continue;
+     if(PTE_FLAGS(*pte) == PTE_V)
+       panic("uvmunmap: not a leaf");
+     if(do_free){
