@@ -85,14 +85,17 @@ usertrap(void)
 
   usertrapret();
 }
+// kill 这个参数 是因为 va >= p->sz || va <= p->trapframe->sp 这种限制 在 walkaddr 中 不能杀掉进程，不然会通不过测试
+// 但是理论上来说，即便杀掉也是正当的。
 pte_t *handlePageFault(uint64 va, int kill)
 {
   // printf("page fault %p\n", va);
   struct proc *p = myproc();
   pte_t *pte;
-  if(va >= p->sz || va <= p->trapframe->sp )  {
+  if(va >= p->sz || va <= p->trapframe->sp)  {
     if(kill) exit(-1);
-    return 0;
+    return 0;  
+    // 下面这个判断是为了防止 remap
   } else if((pte = walk(p->pagetable, va, 0)) == 0 ||(*pte & PTE_V) == 0) {
     char* kp = (char*)kalloc();
     if(kp == 0)  {
