@@ -140,7 +140,7 @@ int             fetchaddr(uint64, uint64*);
 void            syscall();
 
 // trap.c
-uint64 handlePageFault(uint64 va, int );
+pte_t* handlePageFault(uint64 va, int );
 extern uint     ticks;
 void            trapinit(void);
 void            trapinithart(void);

@@ -70,37 +70,13 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else if(r_scause() == 15 || r_scause() == 13) {
-      // if(r_stval() >= MAXVA) exit(-1);
       handlePageFault(r_stval(), 1);
-      
-      // uint64 va = r_stval();
-      // pte_t *pte;
-      // // printf("page fault %p\n", va);
-      // // printf("page fault %p\n",);
-      // if(va >= p->sz || va <= p->trapframe->sp) 
-      // {
-      //   printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-      //   printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-      //   p->killed = 1;
-      // } else if((pte = walk(p->pagetable, va, 0)) == 0 ||(*pte & PTE_V) == 0) {
-      //     char* kp = (char*)kalloc();
-      //     if(kp == 0)  {
-      //         printf("out of memory\n");
-      //         p->killed = 1;
-      //     } else {
-      //       memset(kp, 0, PGSIZE);
-      //       if(mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)kp, PTE_U | PTE_W | PTE_R | PTE_X) < 0) {
-      //         kfree(kp);
-      //         p->killed = 1;
-      //       }
-      //     }
-      // }
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
   }
-  if(p->killed) 
+  if(p->killed)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
@@ -109,7 +85,7 @@ usertrap(void)
 
   usertrapret();
 }
-uint64 handlePageFault(uint64 va, int kill)
+pte_t *handlePageFault(uint64 va, int kill)
 {
   // printf("page fault %p\n", va);
   struct proc *p = myproc();
@@ -120,7 +96,7 @@ uint64 handlePageFault(uint64 va, int kill)
   } else if((pte = walk(p->pagetable, va, 0)) == 0 ||(*pte & PTE_V) == 0) {
     char* kp = (char*)kalloc();
     if(kp == 0)  {
-        printf("out of memory\n");
+        // printf("out of memory\n");
         exit(-1);
     } else {
       memset(kp, 0, PGSIZE);
@@ -130,7 +106,7 @@ uint64 handlePageFault(uint64 va, int kill)
       }
     }
   }
-  return (uint64)pte;
+  return pte;
 }
 //
 // return to user space

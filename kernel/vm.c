@@ -87,49 +87,18 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
   }
   return &pagetable[PX(0, va)];
 }
-#include "spinlock.h"
-#include "proc.h"
 // Look up a virtual address, return the physical address,
 // or 0 if not mapped.
 // Can only be used to look up user pages.
 uint64
 walkaddr(pagetable_t pagetable, uint64 va)
 {
-//   pte_t *pte;
-//   uint64 pa;
-
   if(va >= MAXVA)
     return 0;
-//   struct proc *p = myproc();
-//   pte = walk(pagetable, va, 0);
-//   if(pte == 0)
-//     return 0;
-//   if((*pte & PTE_V) == 0)
-//     return 0;
-//   if((*pte & PTE_U) == 0)
-//     return 0;
-//   pa = PTE2PA(*pte);
-//   return pa;
-//   if(pte == 0 || (*pte & PTE_V) == 0) {
-//     if(va >= p->sz || va <= p->trapframe->sp) return 0;
-//     char* kp = (char*)kalloc();
-//       if(kp == 0)  {
-//           printf("out of memory\n");
-//           exit(-1);
-//       } else {
-//         memset(kp, 0, PGSIZE);
-//         if(mappages(pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)kp, PTE_U | PTE_W | PTE_R) < 0) {
-//           kfree(kp);
-//           panic("mappages");
-//         }
-//       }
-//   }   
-//   pte = walk(pagetable, va, 0);
-//   pa = PTE2PA(*pte);
-//   return pa;
+
   pte_t *pte = walk(pagetable, va, 0);
   if(pte == 0 || (*pte & PTE_V) == 0) 
-    pte = (pte_t *)handlePageFault(va, 0);
+    pte = handlePageFault(va, 0);
   if(pte == 0) return 0;
   return PTE2PA(*pte);
 }
@@ -383,7 +352,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0) 
+    if(pa0 == 0)
       return -1;
     n = PGSIZE - (dstva - va0);
     if(n > len)
@@ -408,7 +377,7 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
   while(len > 0){
     va0 = PGROUNDDOWN(srcva);
     pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0) 
+    if(pa0 == 0)
       return -1;
     n = PGSIZE - (srcva - va0);
     if(n > len)
