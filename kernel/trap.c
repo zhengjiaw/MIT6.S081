@@ -82,8 +82,29 @@ usertrap(void)
       if(--p->alm.ticks_count == 0 ) {
         p->alm.ticks_count = p->alm.count;
         p->alm.processing = 1;
-        // 保存当前所有寄存器
-        memmove(p->alm.trapframe, p->trapframe, sizeof (struct trapframe));
+        // 保存当前 caller 寄存器
+        p->alm.saved->ra = p->trapframe->ra;
+
+        p->alm.saved->t0 = p->trapframe->t0;
+        p->alm.saved->t1 = p->trapframe->t1;
+        p->alm.saved->t2 = p->trapframe->t2;
+        p->alm.saved->t3 = p->trapframe->t3;
+        p->alm.saved->t4 = p->trapframe->t4;
+        p->alm.saved->t5 = p->trapframe->t5;
+        p->alm.saved->t6 = p->trapframe->t6;
+
+        p->alm.saved->a0 = p->trapframe->a0;
+        p->alm.saved->a1 = p->trapframe->a1;
+        p->alm.saved->a2 = p->trapframe->a2;
+        p->alm.saved->a3 = p->trapframe->a3;
+        p->alm.saved->a4 = p->trapframe->a4;
+        p->alm.saved->a5 = p->trapframe->a5;
+        p->alm.saved->a6 = p->trapframe->a6;
+        p->alm.saved->a7 = p->trapframe->a7;
+
+        p->alm.saved->epc = p->trapframe->epc;
+        p->alm.saved->sp = p->trapframe->sp;
+        p->alm.saved->s0 = p->trapframe->s0;
         // epc 是 sret 设置的 PC，更换之后就可以返回到 handler
         p->trapframe->epc = (uint64)p->alm.handler;
       }

@@ -81,11 +81,39 @@ struct trapframe {
 };
 
 enum procstate { UNUSED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+struct savedr{
+// Return address
+  uint64 ra;
+// Temporaries
+  uint64 t0;
+  uint64 t1;
+  uint64 t2;
+// Function arguments/return values
+  uint64 a0;
+  uint64 a1;
+  uint64 a2;
+  uint64 a3;
+  uint64 a4;
+  uint64 a5;
+  uint64 a6;
+  uint64 a7;
+// Temporaries
+  uint64 t3;
+  uint64 t4;
+  uint64 t5;
+  uint64 t6;
+// 用户栈信息
+  uint64 epc;
+  uint64 sp; 
+  uint64 s0;
+// FP temporaries 不考虑
+
+};
 struct alarm {
   int count; // 用户设置的 ticks 周期
   int ticks_count; // 已经减少了的 周期， 为0的时候调用 handler
   void (*handler)();
-  struct trapframe *trapframe; // 为了恢复上下文
+  struct savedr *saved; // 为了恢复上下文
   int processing; // handler 如果真正调用 就为 1，否则为0
 };
 // Per-process state

@@ -148,7 +148,31 @@ void* memmove(void *, const void *, uint);
 uint64 sys_sigreturn(void)
 {
   struct proc *p = myproc();
-  memmove(p->trapframe, p->alm.trapframe, sizeof (struct trapframe));
+  p->trapframe->ra = p->alm.saved->ra;
+
+  p->trapframe->t0 = p->alm.saved->t0;
+  p->trapframe->t1 = p->alm.saved->t1;
+  p->trapframe->t2 = p->alm.saved->t2;
+  p->trapframe->t3 = p->alm.saved->t3;
+  p->trapframe->t4 = p->alm.saved->t4;
+  p->trapframe->t5 = p->alm.saved->t5;
+  p->trapframe->t6 = p->alm.saved->t6;
+
+  p->trapframe->a0 = p->alm.saved->a0;
+  p->trapframe->a1 = p->alm.saved->a1;
+  p->trapframe->a2 = p->alm.saved->a2;
+  p->trapframe->a3 = p->alm.saved->a3;
+  p->trapframe->a4 = p->alm.saved->a4;
+  p->trapframe->a5 = p->alm.saved->a5;
+  p->trapframe->a6 = p->alm.saved->a6;
+  p->trapframe->a7 = p->alm.saved->a7;
+
+  p->trapframe->epc = p->alm.saved->epc;
+  p->trapframe->sp = p->alm.saved->sp;
+  p->trapframe->s0 = p->alm.saved->s0;
+
+
+
   p->alm.processing = 0;
   usertrapret();
   return 0;

@@ -128,7 +128,7 @@ found:
   p->context.sp = p->kstack + PGSIZE;
   
   memset(&p->alm, 0, sizeof p->alm);
-  if((p->alm.trapframe = (struct trapframe *)kalloc()) == 0){
+  if((p->alm.saved = (struct savedr *)kalloc()) == 0){
     release(&p->lock);
     return 0;
   }
@@ -155,8 +155,8 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
-  if(p->alm.trapframe)
-    kfree((void*)p->alm.trapframe);
+  if(p->alm.saved)
+    kfree((void*)p->alm.saved);
   memset(&p->alm, 0, sizeof p->alm);
 }
 
