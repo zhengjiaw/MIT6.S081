@@ -2664,6 +2664,8 @@ run(void f(char *), char *s) {
 int
 main(int argc, char *argv[])
 {
+//   for(uint64 i = 0;i < 2*PGSIZE; ++ i)
+//     *(char*)i = 0;
   int continuous = 0;
   char *justone = 0;
 

@@ -60,6 +60,9 @@ void            ramdiskintr(void);
 void            ramdiskrw(struct buf*);
 
 // kalloc.c
+#define         PA2PID(pa) (((uint64)(pa) - KERNBASE) / PGSIZE)
+int             P(int id);
+int             V(int id);
 void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
@@ -140,6 +143,7 @@ int             fetchaddr(uint64, uint64*);
 void            syscall();
 
 // trap.c
+int             handleCOWfault(pagetable_t pagetable, uint64 va);
 extern uint     ticks;
 void            trapinit(void);
 void            trapinithart(void);
@@ -154,6 +158,7 @@ void            uartputc_sync(int);
 int             uartgetc(void);
 
 // vm.c
+pte_t *         walk(pagetable_t pagetable, uint64 va, int alloc);
 void            kvminit(void);
 void            kvminithart(void);
 uint64          kvmpa(uint64);
