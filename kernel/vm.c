@@ -93,13 +93,9 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
 uint64
 walkaddr(pagetable_t pagetable, uint64 va)
 {
-  if(va >= MAXVA)
+  if(handlePageFault(pagetable, va) == -1)
     return 0;
-
   pte_t *pte = walk(pagetable, va, 0);
-  if(pte == 0 || (*pte & PTE_V) == 0) 
-    pte = handlePageFault(va, 0);
-  if(pte == 0) return 0;
   return PTE2PA(*pte);
 }
 

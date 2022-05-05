@@ -70,7 +70,7 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else if(r_scause() == 15 || r_scause() == 13) {
-      handlePageFault(r_stval(), 1);
+      handlePageFault(p->pagetable, r_stval());
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
@@ -87,29 +87,30 @@ usertrap(void)
 }
 // kill 这个参数 是因为 va >= p->sz || va <= p->trapframe->sp 这种限制 在 walkaddr 中 不能杀掉进程，不然会通不过测试
 // 但是理论上来说，即便杀掉也是正当的。
-pte_t *handlePageFault(uint64 va, int kill)
+int handlePageFault(pagetable_t pagetable, uint64 va)
 {
   // printf("page fault %p\n", va);
   struct proc *p = myproc();
   pte_t *pte;
-  if(va >= p->sz || va <= p->trapframe->sp)  {
-    if(kill) exit(-1);
-    return 0;  
-    // 下面这个判断是为了防止 remap
-  } else if((pte = walk(p->pagetable, va, 0)) == 0 ||(*pte & PTE_V) == 0) {
+  if(va >= MAXVA)
+    return -1;
+  if((pte = walk(pagetable, va, 0)) == 0 || (*pte & PTE_V) == 0) {
+    if(va >= p->sz || va <= p->trapframe->sp)  {
+      return -1;
+    } 
     char* kp = (char*)kalloc();
     if(kp == 0)  {
-        // printf("out of memory\n");
+        printf("out of memory\n");
         exit(-1);
     } else {
       memset(kp, 0, PGSIZE);
-      if(mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)kp, PTE_U | PTE_W | PTE_R) < 0) {
+      if(mappages(pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)kp, PTE_U | PTE_W | PTE_R) < 0) {
         kfree(kp);
         panic("handlePageFault");
       }
     }
   }
-  return pte;
+  return 0;
 }
 //
 // return to user space
