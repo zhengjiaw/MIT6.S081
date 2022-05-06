@@ -420,13 +420,15 @@ wait(uint64 addr)
         if(np->state == ZOMBIE){
           // Found one.
           pid = np->pid;
-          if(addr != 0 && copyout(p->pagetable, addr, (char *)&np->xstate,
-                                  sizeof(np->xstate)) < 0) {
+          int temp = np->xstate;
+          freeproc(np);
+          if(addr != 0 && copyout(p->pagetable, addr, (char *)&temp,
+                                  sizeof(temp)) < 0) {
             release(&np->lock);
             release(&p->lock);
             return -1;
           }
-          freeproc(np);
+         
           release(&np->lock);
           release(&p->lock);
           return pid;

@@ -67,7 +67,7 @@ usertrap(void)
     syscall();
   } else if(r_scause() == 13 || r_scause() == 15) {
     uint64 va = r_stval();
-    if(handleCOWfault(p->pagetable, va) == -1)
+    if(handleLazyFault(p->pagetable, va) == -1 || handleCOWfault(p->pagetable, va) == -1)
       p->killed = 1;
   } else if((which_dev = devintr()) != 0){
     // ok
@@ -89,7 +89,7 @@ usertrap(void)
 int handleCOWfault(pagetable_t pagetable, uint64 va) 
 {
   // 1.判断 va 合法性
-  if(va > MAXVA) 
+  if(va >= MAXVA) 
     return -1;
   pte_t *pte = walk(pagetable, va, 0);
   if(pte == 0 || (*pte & (PTE_V)) == 0 || (*pte & PTE_U) == 0) 
@@ -110,6 +110,34 @@ int handleCOWfault(pagetable_t pagetable, uint64 va)
   memmove((char*)newPa, (char*)pa, PGSIZE);
   // 3.减少 pa 映射
   kfree((void*)pa);
+  return 0;
+}
+// kill 这个参数 是因为 va >= p->sz || va <= p->trapframe->sp 这种限制 在 walkaddr 中 不能杀掉进程，不然会通不过测试
+// 但是理论上来说，即便杀掉也是正当的。
+int handleLazyFault(pagetable_t pagetable, uint64 va)
+{
+ // printf("page fault %p\n", va);
+  struct proc *p = myproc();
+  pte_t *pte;
+  if(va > MAXVA)
+    return -1;
+  // 如果找的到用户页面，说明并不是 lazy page fault，直接返回0
+  if((pte = walk(pagetable, va, 0)) && (*pte & PTE_V))
+    return 0;
+  // 是 lazy page fault，先判断是否在堆上
+  if(va >= p->sz || va <= p->trapframe->sp) 
+    return -1;
+  char* kp = (char*)kalloc();
+  if(kp == 0)  {
+    printf("out of memory\n");
+    exit(-1);
+  } else {
+    memset(kp, 0, PGSIZE);
+    if(mappages(pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)kp, PTE_U | PTE_W | PTE_R) < 0) {
+      kfree(kp);
+      panic("handleLazyFault");
+    }
+  }
   return 0;
 }
 //

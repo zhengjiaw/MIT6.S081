@@ -144,6 +144,7 @@ void            syscall();
 
 // trap.c
 int             handleCOWfault(pagetable_t pagetable, uint64 va);
+int             handleLazyFault(pagetable_t pagetable, uint64 va);
 extern uint     ticks;
 void            trapinit(void);
 void            trapinithart(void);
