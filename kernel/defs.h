@@ -61,6 +61,7 @@ void            ramdiskrw(struct buf*);
 
 // kalloc.c
 #define         PA2PID(pa) (((uint64)(pa) - KERNBASE) / PGSIZE)
+int             getrefcount(int id);
 int             P(int id);
 int             V(int id);
 void*           kalloc(void);

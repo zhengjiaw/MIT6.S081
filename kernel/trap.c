@@ -98,9 +98,14 @@ int handleCOWfault(pagetable_t pagetable, uint64 va)
   // 没有写权限如果不是 COW 页，就代表出错了
   if((*pte & PTE_COW) == 0) 
     return -1;
-  
   // 2. 添加新的映射
   uint64 pa = PTE2PA(*pte);
+  if(getrefcount(PA2PID(pa)) == 1) {
+    *pte &= ~PTE_COW;
+    *pte |= PTE_W;
+    return 0;
+  }
+
   void *newPa = kalloc();
   if(newPa == 0) {
     printf("handleCOWfault kalloc out of memory \n");
