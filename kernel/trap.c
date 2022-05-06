@@ -89,7 +89,7 @@ usertrap(void)
 int handleCOWfault(pagetable_t pagetable, uint64 va) 
 {
   // 1.判断 va 合法性
-  if(va >= MAXVA) 
+  if(va > MAXVA) 
     return -1;
   pte_t *pte = walk(pagetable, va, 0);
   if(pte == 0 || (*pte & (PTE_V)) == 0 || (*pte & PTE_U) == 0) 
@@ -98,9 +98,14 @@ int handleCOWfault(pagetable_t pagetable, uint64 va)
   // 没有写权限如果不是 COW 页，就代表出错了
   if((*pte & PTE_COW) == 0) 
     return -1;
-  
   // 2. 添加新的映射
   uint64 pa = PTE2PA(*pte);
+  if(getrefcount(PA2PID(pa)) == 1) {
+    *pte &= ~PTE_COW;
+    *pte |= PTE_W;
+    return 0;
+  }
+
   void *newPa = kalloc();
   if(newPa == 0) {
     printf("handleCOWfault kalloc out of memory \n");
@@ -112,8 +117,6 @@ int handleCOWfault(pagetable_t pagetable, uint64 va)
   kfree((void*)pa);
   return 0;
 }
-// kill 这个参数 是因为 va >= p->sz || va <= p->trapframe->sp 这种限制 在 walkaddr 中 不能杀掉进程，不然会通不过测试
-// 但是理论上来说，即便杀掉也是正当的。
 int handleLazyFault(pagetable_t pagetable, uint64 va)
 {
  // printf("page fault %p\n", va);

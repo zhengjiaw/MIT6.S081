@@ -28,6 +28,13 @@ struct {
   // 物理地址最大是 PHYSTOP
   int refcount[PA2PID(PHYSTOP) + 1]; 
 } pagerefcount;
+int getrefcount(int id)
+{
+  acquire(&pagerefcount.lock);
+  int t = pagerefcount.refcount[id];
+  release(&pagerefcount.lock);
+  return t;
+}
 int P(int id) 
 {
   acquire(&pagerefcount.lock);
